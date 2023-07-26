@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <!-- import CSS -->
+  <!-- <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css"> -->
+  <link rel="stylesheet" href="./css/element.css">
+  <link rel="stylesheet" href="./css/styles.css">
+</head>
+
+<body>
+  <div id="app">
+    <div v-show="lockShow" class="loginBackground" :style="loginHeigth">
+
+
+      <div class="login-container">
+        <el-card class="box-card">
+          <div class="sunIconStyle">
+            <img src="./2.gif" alt="" width="80px" height="80px">
+            <!-- <i class="el-icon-sunrise-1" style="font-size:50px;color: #F56C6C;"></i> -->
+          </div>
+          <el-form ref="form" :model="form" :rules="formRules" @submit.native.prevent>
+            <el-form-item label="" prop="password">
+              <el-input placeholder="请输入密码" v-model="form.password" type="password" @keyup.enter.native="submitForm"
+                class="input-with-select">
+                <el-button slot="prepend" style="font-size: 20px;font-weight: 700;" icon="el-icon-basketball">
+                </el-button>
+            </el-form-item>
+            <el-form-item>
+              <el-button style="width: 100%;" type="primary" @click="submitForm">登录</el-button>
+            </el-form-item>
+          </el-form>
+        </el-card>
+
+      </div>
+    </div>
+    <el-container v-show="!lockShow">
+      <el-aside width="40%" class="asideBox">
+        <div :style="setHeigth" class="setHeigthBox">
+
+          <div class="apikeyBox">
+            <span class="apikeyBoxkey">
+              API KEY:(一行一个key)
+              <span class="clearBtn">
+
+
+
+
+                <el-tooltip class="item" effect="dark" content="保存" placement="right">
+                  <el-button type="primary" icon="el-icon-sell" size="mini" @click="toSaveKeys()">
+
+                  </el-button>
+                </el-tooltip>
+                <el-tooltip class="item" effect="dark" content="删除" placement="right">
+      
+
+                  <el-button type="danger" icon="el-icon-delete"  size="mini" @click="toDelKeys()" ></el-button>
+
+
+                </el-tooltip>
+
+
+
+
+
+              </span>
+
+
+            </span>
+            <div>
+              <el-input v-model="gptForm.keyApi" @input="keyChange" size="mini" placeholder="请输入key" style="width: 100%"
+                type="textarea" :rows="4"></el-input>
+            </div>
+          </div>
+          <div class="apikeyBox">
+            <span class="apikeyBoxkey">
+              最大token:<span class="apikeyBoxTip">一个汉字 = 2个token</span>
+            </span>
+            <div class="textareaBox">
+              <el-input-number v-model="gptForm.apikeyTokennum" style="width: 100%" size="mini"></el-input-number>
+            </div>
+          </div>
+          <div class="apikeyBox">
+            <span class="apikeyBoxkey">
+              随 机 性:
+            </span>
+            <div>
+              <el-slider class="elslider" v-model="gptForm.temperature" style="width: 100%" :step="0.1" :min="0"
+                :max="2"></el-slider>
+            </div>
+          </div>
+          <div class="apikeyBox">
+            <span class="apikeyBoxkey">
+              线 程 数:
+            </span>
+            <div>
+              <el-input-number v-model="gptForm.apiNumber" :min="1" :max="maxapiNumber" style="width: 100%" size="mini">
+              </el-input-number>
+
+            </div>
+          </div>
+          <div class="apikeyBox">
+            <span class="apikeyBoxkey">
+              批量生成列表
+              <div class="apikeyBoxTip">标题格式:#你好{李焕英} (#后为提问的问题,{}里是标题)</div>
+            </span>
+            <div class="textareaBox">
+              <el-input type="textarea" placeholder="请输入问题" size="mini" v-model="gptForm.textarea" :rows="6">
+              </el-input>
+            </div>
+          </div>
+        </div>
+        <div class="setheightButtonBox">
+
+
+          <el-progress :percentage="percentage" style="margin-bottom:10px" :stroke-width="15"></el-progress>
+
+
+          <div style="   text-align: right;">
+            <el-button size="mini" @click="toLock()">锁定</el-button>
+            <el-button size="mini" @click="toClearAllProblome()">清空</el-button>
+            <el-button size="mini" type="primary" @click="toSendAllProblome()" :loading="loading">确认</el-button>
+          </div>
+
+        </div>
+
+      </el-aside>
+      <el-main class="contentBox">
+
+        <div class="contentTips">
+          生成内容:
+          <span class="clearBtn">
+            <!-- <el-badge :value="ingArr.length" class="item" style="margin-right:10px;">
+              <el-button size="mini" @click="ingVisible = true">进度</el-button>
+            </el-badge> -->
+            <el-badge :value="errArr.length" class="item" style="margin-right:10px;">
+              <el-button size="mini" @click="dialogVisible = true">失败</el-button>
+            </el-badge>
+            <el-button type="primary" icon="el-icon-delete" size="mini" @click="toClear()"></el-button>
+          </span>
+        </div>
+        <div :style="boxHeigth" class="boxHeigthStyle">
+          <el-card class="box-card" v-for="(item,index) in currentAssistantMessage" :key="index">
+            <div class="contentBoxTitle">
+              {{item.title}}
+              <span class="contentBoxTitleTips">
+                ({{`${item.foldname}/${item.title}.txt`}})
+              </span>
+
+            </div>
+            <div>
+              {{item.content}}
+            </div>
+          </el-card>
+        </div>
+      </el-main>
+    </el-container>
+
+    <el-dialog title="生成进度" :visible.sync="ingVisible" width="500px" class="diaClass">
+      <div class="errListBox">
+        <el-card v-for="(item,index) in  ingArr" :key="index" style="margin-bottom:10px">
+          <el-row>
+            <el-col :span="24" class="ellipsisFlag">
+              <span>
+                标题:
+              </span>
+              <span class="titleStyle">
+                {{item.title}}
+              </span>
+
+
+            </el-col>
+
+            <el-col :span="24" class="ellipsisFlag" style="margin-top: 5px">
+              <span>
+                状态:
+              </span>
+              <span class="errorStyle">
+                {{item.isFinsh?'完成':'进行中'}}
+              </span>
+
+            </el-col>
+          </el-row>
+
+        </el-card>
+      </div>
+
+      <span slot="footer" class="dialog-footer">
+
+        <!-- <el-button type="primary" @click="toSendApi" size="mini"> 重 试</el-button> -->
+      </span>
+    </el-dialog>
+    <el-dialog title="错误列表" :visible.sync="dialogVisible" width="500px" class="diaClass">
+      <div class="errListBox">
+        <el-card v-for="(item,index) in  errArr" :key="index" style="margin-bottom:10px">
+          <el-row>
+            <el-col :span="24" class="ellipsisFlag">
+              <span>
+                标题:
+              </span>
+              <span class="titleStyle">
+                {{item.title}}
+              </span>
+
+            </el-col>
+
+            <el-col :span="24" class="ellipsisFlag" style="margin-top: 5px">
+              <span>
+                失败原因:
+              </span>
+              <span class="errorStyle">
+                {{item.err}}
+              </span>
+
+            </el-col>
+          </el-row>
+
+        </el-card>
+      </div>
+
+      <span slot="footer" class="dialog-footer">
+
+        <!-- <el-button type="primary" @click="toSendApi" size="mini"> 重 试</el-button> -->
+      </span>
+    </el-dialog>
+  </div>
+</body>
+
+<!-- <script src="https://unpkg.com/vue@2/dist/vue.js"></script> -->
+<script src="./js/vue.js"></script>
+
+<!-- <script src="https://unpkg.com/element-ui/lib/index.js"></script> -->
+<script src="./js/element.js"></script>
+<!-- <script src="https://unpkg.com/axios/dist/axios.min.js"></script> -->
+<script src="./js/axios.js"></script>
+<!-- <script src="./preload.js"></script> -->
+<script>
+  // const { ipcRenderer } = require('electron')
+  new Vue({
+    el: '#app',
+    data: function () {
+      return {
+        ingVisible: false,
+        ingArr: [
+
+        ],
+        dialogVisible: false,
+        errArr: [
+
+        ],
+        maxapiNumber: 3,
+        formRules: {
+          password: [{
+            required: true,
+            message: '不能为空',
+            trigger: 'blur'
+          }],
+        }
+
+        ,
+        form: {
+          username: '',
+          password: ''
+        },
+        lockShow: true,
+        percentage: 0,
+        keyindex: 0,
+        keyArr: [],
+        sendArr: [],
+        sendNum: 0,
+        okNum: 0,
+        loading: false,
+        currentAssistantMessage: [],
+
+        gptForm: {
+          keyApi: '',
+          temperature: 1,
+          textarea: '',
+          apikeyTokennum: 3000,
+          apiNumber: 3
+        },
+
+        setHeigth: "height:" + (window.innerHeight - 110) + "px",
+        boxHeigth: "height:" + (window.innerHeight - 100) + "px",
+        loginHeigth: "height:" + (window.innerHeight - 30) + "px",
+      }
+    },
+
+    mounted() {
+      this.toReadKeys()
+
+
+      window.electron.checkFolder()
+
+
+      window.addEventListener("resize", () => {
+        this.setHeigth = "height:" + (window.innerHeight - 110) + "px"
+        this.boxHeigth = "height:" + (window.innerHeight - 100) + "px"
+        this.loginHeigth = "height:" + (window.innerHeight - 30) + "px"
+      });
+    },
+    methods: {
+      toDelKeys() {
+        window.electron.delFile(`./keys.txt`).then(res => {
+          this.$message({
+            type: 'success',
+            message: '删除成功'
+          })
+        })
+      },
+      toSaveKeys() {
+
+        let keyArr = this.gptForm.keyApi.split("\n");
+        
+
+        window.electron.writeFile(`./keys.txt`,JSON.stringify(keyArr)).then(() => {
+          this.$message({
+            type: 'success',
+            message: '保存成功'
+          })
+        })
+      },
+      toReadKeys() {
+        window.electron.readFile('./keys.txt').then(res => {
+          let jsonKey = JSON.parse(res)
+          this.gptForm.keyApi =   jsonKey.join('\n')
+          this.keyChange()
+        }).catch(err => {
+          console.log(err);
+        })
+      },
+      toSendApi() {
+
+        this.loading = true
+        let arr = []
+        let sendArr = this.errArr
+
+        if (sendArr.length > this.gptForm.apiNumber) {
+          arr = sendArr.slice(0, this.gptForm.apiNumber)
+
+          this.sendArr = sendArr.slice(this.gptForm.apiNumber, sendArr.length)
+
+        } else {
+          arr = sendArr
+          this.sendArr = []
+        }
+
+
+
+
+        this.sendNum = sendArr.length
+
+        this.setApi(arr)
+        this.dialogVisible = false
+        this.errArr = []
+
+      },
+      keyChange() {
+        let keyArr = this.gptForm.keyApi.split("\n");
+        this.maxapiNumber = keyArr.length * 3
+      },
+      toLock() {
+        this.lockShow = true
+      },
+      submitForm() {
+        console.log('执行');
+        this.$refs.form.validate(valid => {
+          if (valid) {
+            if (this.form.password == 'admin') {
+              console.log('登陆成功');
+              this.lockShow = false
+              this.form.password = ''
+            } else {
+              this.$notify({
+                title: '警告',
+                message: '密码错误',
+                type: 'warning'
+              });
+              this.lockShow = true
+            }
+          } else {
+            this.lockShow = true
+            return
+          }
+        });
+      },
+      toClear() {
+        this.currentAssistantMessage = []
+      },
+      getNextItem() {
+        console.log(this.keyArr);
+        console.log('按顺序获取');
+        if (this.keyindex >= this.keyArr.length) {
+          this.keyindex = 0;
+        }
+        const item = this.keyArr[this.keyindex];
+        this.keyindex++;
+    
+        return item;
+      },
+
+
+      setApi(arr) {
+
+
+        // let getnext = this.getNextItem()
+        for (let index = 0; index < arr.length; index++) {
+          const el = arr[index];
+
+          if (el.key == '') {
+            el.key = this.getNextItem()
+          }
+          fetch("https://api.openai.com/v1/chat/completions", {
+              method: "post",
+
+              // url: "http://ai.tgyc.com/tgai",
+              // url: "/api/generate",
+
+              body: JSON.stringify({
+                model: "gpt-3.5-turbo",
+                stream: true,
+                max_tokens: this.gptForm.apikeyTokennum,
+                temperature: this.gptForm.temperature,
+                messages: [{
+                  content: el.message,
+                  role: "user"
+                }, ]
+              }),
+
+              // proxy,
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${el.key}`,
+              },
+            })
+            .then(async (opres) => {
+              const {
+                body,
+                status
+              } = opres;
+              console.log(status);
+              if (status == '200') {
+                if (body) {
+                  const reader = body.getReader();
+                  await this.readStream(reader, status, el);
+                }
+              } else if (status == '429') {
+
+                el.key = ''
+                console.log(el);
+                console.log('重新请求失败的');
+                setTimeout(() => {
+                 
+                  this.setApi([el])
+                }, 20000);
+
+              } else if(status == '401'){
+                let findkey = (node)=>{
+                  return node == el.key
+                }
+                let keyindex =  this.keyArr.findIndex(findkey)
+                console.log(el.key);
+                console.log(keyindex);
+                console.log(this.keyArr);
+                if(keyindex != -1){
+                  this.keyArr.splice(keyindex,1)
+                }
+                el.key = ''
+                console.log(el);
+                console.log('请求key失败的');
+                setTimeout(() => {
+                 
+                  this.setApi([el])
+                }, 20000);
+
+            
+              }
+              return
+              // const regex = /({.*?]})/g;
+              // console.log(opres);
+              // const {
+              //   status
+              // } = opres;
+
+              // if (status == '200') {
+              //   let messagelist = opres.data.match(regex)
+              //   console.log(messagelist);
+              //   messagelist.forEach((v) => {
+              //     if (v.indexOf("choices") != -1) {
+
+              //       const json = JSON.parse(v);
+              //       console.log(json);
+              //       if (json.choices[0].finish_reason == "stop") {
+              //         console.log('输入完毕');
+              //         window.electron.writeFile(`./${el.title}.txt`, el.content).then(() => {
+              //           console.log('File saved.');
+              //           this.okNum++
+              //           this.currentAssistantMessage.push(el)
+              //           if (this.sendNum == this.okNum) {
+              //             this.loading = false
+              //             this.okNum = 0
+              //             this.gptForm.textarea = ''
+              //           }
+
+              //         }).catch((err) => {
+              //           console.error(err);
+              //         });
+
+              //       } else {
+              //         let backData = json.choices[0].delta.content != undefined ? json.choices[0].delta
+              //           .content : '';
+              //         el.content += backData
+              //         console.log(el.content);
+
+              //         console.log('返回数据');
+              //       }
+
+
+
+
+              //     }
+              //   });
+
+              // }
+            })
+            .catch((err) => {
+              if (err == 'TypeError: Failed to fetch') {
+                err = '网络请求失败,请刷新页面重试'
+                // this.loading = false
+              }
+              el.err = err
+              this.errArr.push(el)
+
+              // this.loading = false
+              this.$notify({
+                title: '警告',
+                message: `请求失败:${err}`,
+                type: 'warning',
+                duration: 0
+              });
+              // this.okNum = 0
+              // this.sendNum = 0
+              // console.log(err);
+
+            });
+        }
+
+      },
+      async readStream(reader, status, el) {
+
+        const decoder = new TextDecoder("utf-8");
+        const regex = /({.*?]})/g;
+        const {
+          done,
+          value
+        } = await reader.read();
+        if (done) {
+
+          return;
+        }
+        const decodeText = decoder.decode(value);
+        const dataList = status === 200 ? decodeText.match(regex) : [decodeText];
+        dataList.forEach((v) => {
+          if (v.indexOf("choices") != -1) {
+            const json = JSON.parse(v);
+            if (json.choices[0].finish_reason == "stop") {
+
+         
+
+
+              window.electron.writeFile(`${el.foldname}/${el.title}.txt`, el.content).then(() => {
+
+                  el.isFinsh = true
+
+                  console.log('File saved.');
+                  this.okNum++
+
+                  console.log(`完成数${this.okNum}`);
+                  console.log(`发送数${this.sendNum}`);
+
+                  this.percentage = parseInt(((this.okNum + this.errArr.length) / this.sendNum) * 100)
+                  console.log(this.percentage);
+                  if (this.percentage == 100) {
+
+                    this.$notify({
+                      title: '完成',
+                      type: 'success',
+                      message: '文章生成成功',
+                      duration: 0
+                    });
+
+                  }
+                  this.currentAssistantMessage.push(el)
+
+
+                  if (this.sendArr.length != 0) {
+                    this.setApi([this.sendArr[0]])
+                    this.sendArr.splice(0, 1)
+                  }
+
+
+                  if (this.sendNum == (this.okNum + this.errArr.length)) {
+                    this.loading = false
+                    this.okNum = 0
+                    this.gptForm.textarea = ''
+                  }
+
+                })
+                .catch(err => {
+
+                  el.err = err
+                  this.errArr.push(el)
+
+                  this.$notify({
+                    title: '警告',
+                    message: `请求失败:${err}`,
+                    type: 'warning',
+                    duration: 0
+                  });
+                })
+
+            } else {
+
+
+              let backData = json.choices[0].delta.content != undefined ? json.choices[0].delta.content : '';
+              el.content += backData
+
+            }
+
+
+
+
+          }
+        });
+        await this.readStream(reader, status, el);
+      },
+      toClearAllProblome() {
+
+        this.gptForm.textarea = ''
+        this.currentAssistantMessage = []
+      },
+      //毫秒时间戳转日期时间
+      stampToDateMD(data) {
+        let thisdata = new Date();
+        let thistime;
+
+        thisdata.setTime(data);
+        thistime =
+          thisdata.getFullYear() +
+          "年" +
+          (thisdata.getMonth() + 1) +
+          "月" +
+          thisdata.getDate() + "日" +
+          ` ${thisdata.getHours()}时${thisdata.getMinutes()}分${thisdata.getSeconds()}秒`
+
+
+        return thistime;
+      },
+      //  发送请求
+      toSendAllProblome() {
+        console.log('发送请求');
+
+
+        if (this.gptForm.keyApi == null || this.gptForm.keyApi == '') {
+
+          this.$notify({
+            title: '警告',
+            message: 'API KEY不能为空',
+            type: 'warning'
+          });
+          return
+        }
+        if (this.gptForm.textarea == null || this.gptForm.textarea == '') {
+          this.$notify({
+            title: '警告',
+            message: '批量生成列表不能为空',
+            type: 'warning'
+          });
+          return
+        }
+
+        let nowTime = new Date().getTime()
+        let foldname = `./txts/${this.stampToDateMD(nowTime)}`
+
+        console.log(foldname);
+
+
+        // 
+        window.electron.checkTodayFolder(foldname)
+
+
+
+        console.log(this.gptForm.keyApi);
+        let keyArr = this.gptForm.keyApi.split("\n");
+        this.keyArr = keyArr
+        console.log(this.keyArr);
+     
+
+
+        let englistStr = this.gptForm.textarea.replace(/[\?\uFF1F]/g, '')
+
+        let contentArrange = englistStr.split("#");
+        console.log(contentArrange);
+
+
+        let sendArr = []
+
+        contentArrange.forEach(el => {
+          if (el != '') {
+            let startindex = el.indexOf('{')
+            let endindex = el.indexOf('}')
+            let title1 = el.slice(startindex + 1, endindex)
+            console.log(title1);
+            sendArr.push({
+              title: title1,
+              message: el,
+              content: '',
+              foldname: foldname,
+              key: this.getNextItem(),
+            })
+          }
+        });
+        console.log(sendArr);
+        this.sendNum = sendArr.length
+        sendArr.forEach(el => {
+          this.setApi(el)
+        })
+        this.sendArr = sendArr
+
+
+        // this.batchRequest(0)
+        //   .then(() => console.log('All questions have been processed.'));
+
+        this.loading = true
+        let arr = []
+        if (sendArr.length >= this.gptForm.apiNumber) {
+          arr = sendArr.slice(0, this.gptForm.apiNumber)
+
+          this.sendArr = sendArr.slice(this.gptForm.apiNumber, sendArr.length)
+
+        } else {
+          arr = sendArr
+          this.sendArr = []
+        }
+        this.setApi(arr)
+
+
+
+
+
+
+
+
+
+      },
+
+      // 批量请求函数
+      batchRequest(startIndex) {
+        // 如果所有问题都已经请求完毕，则结束
+        if (startIndex >= this.sendArr.length) {
+          return Promise.resolve();
+        }
+
+        // 取出下一个API Key
+        const key = this.keyArr.shift();
+
+        // 如果没有可用的API Key，则稍等一段时间后再次尝试
+        if (!key) {
+          console.log('All this.keyArr have been used, wait for a few seconds...');
+          return new Promise(resolve => setTimeout(resolve, 20000))
+            .then(() => this.batchRequest(startIndex));
+        }
+
+        // 构造API请求URL
+
+
+        // const apiUrl = `https://example.com/api?key=${key}&q=${encodeURIComponent(this.sendArr[startIndex])}`;
+
+
+
+
+
+
+
+
+
+
+
+        // 发送API请求
+        return fetch("https://api.openai.com/v1/chat/completions", {
+            method: "post",
+            body: JSON.stringify({
+              model: "gpt-3.5-turbo",
+              stream: true,
+              max_tokens: this.gptForm.apikeyTokennum,
+              temperature: this.gptForm.temperature,
+              messages: [{
+                content: this.sendArr[startIndex].message,
+                role: "user"
+              }, ]
+            }),
+
+            // proxy,
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${key}`,
+            },
+          })
+          .then(async (response) => {
+
+            const {
+              body,
+              status
+            } = response;
+
+
+
+            if (status === 429) {
+              console.log(`API Key ${key} reaches the request limit, switch to the next key...`);
+              // 如果API Key达到请求限制，则使用下一个API Key再次尝试
+              this.keyArr.push(key);
+              return this.batchRequest(startIndex);
+            } else {
+              if (body) {
+                const reader = body.getReader();
+                await this.readStream(reader, status, this.sendArr[startIndex]);
+              }
+            }
+
+            // 如果请求成功，则继续请求下一个问题
+            return this.batchRequest(startIndex + 1);
+          });
+      },
+    },
+  })
+</script>
+
+</html>
